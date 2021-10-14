@@ -51,6 +51,7 @@
 			:room-actions="roomActions"
 			:menu-actions="menuActions"
 			:room-message="roomMessage"
+			:templates-text="templatesText"
 			@fetch-more-rooms="fetchMoreRooms"
 			@fetch-messages="fetchMessages"
 			@send-message="sendMessage"
@@ -141,7 +142,21 @@ export default {
 				{ name: 'removeUser', title: 'Remove User' },
 				{ name: 'deleteRoom', title: 'Delete Room' }
 			],
-			styles: { container: { borderRadius: '4px' } }
+			styles: { container: { borderRadius: '4px' } },
+			templatesText: [
+				{
+					tag: 'help',
+					text: 'This is the help'
+				},
+				{
+					tag: 'action',
+					text: 'This is the action'
+				},
+				{
+					tag: 'action 2',
+					text: 'This is the second action'
+				}
+			]
 			// ,dbRequestCount: 0
 		}
 	},
@@ -367,7 +382,9 @@ export default {
 				// this.incrementDbCounter('Fetch Room Messages', messages.size)
 				if (this.selectedRoom !== room.roomId) return
 
-				if (messages.empty) this.messagesLoaded = true
+				if (messages.empty || messages.docs.length < this.messagesPerPage) {
+					setTimeout(() => (this.messagesLoaded = true), 0)
+				}
 
 				if (this.startMessages) this.endMessages = this.startMessages
 				this.startMessages = messages.docs[messages.docs.length - 1]
@@ -375,7 +392,7 @@ export default {
 				let listenerQuery = ref.orderBy('timestamp')
 
 				if (this.startMessages) {
-					listenerQuery = listenerQuery.startAfter(this.startMessages)
+					listenerQuery = listenerQuery.startAt(this.startMessages)
 				}
 				if (this.endMessages) {
 					listenerQuery = listenerQuery.endAt(this.endMessages)

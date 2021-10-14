@@ -1,6 +1,6 @@
 {
 	"name": "vue-advanced-chat",
-	"version": "1.1.0",
+	"version": "1.2.1",
 	"license": "MIT",
 	"description": "A beautiful chat rooms component made with Vue.js - compatible with Vue, React & Angular",
 	"author": {
@@ -34,7 +34,7 @@
 		"clean:lib": "rimraf dist",
 		"build:lib": "vue-cli-service build --target lib --no-clean --name vue-advanced-chat ./src/lib/index.js",
 		"build:wc": "vue-cli-service build --target wc --no-clean --name vue-advanced-chat ./src/lib/ChatWindow.vue",
-		"prepublish": "npm run lint && npm run build",
+		"prepublish": "npm run lint && npm run test && npm run build",
 		"publish-beta": "npm publish --tag beta",
 		"lint": "vue-cli-service lint",
 		"test": "jest",
@@ -71,15 +71,15 @@
 		"typescript": "^4.0.5",
 		"vue": "^2.6.14",
 		"vue-jest": "^3.0.7",
-		"vue-template-compiler": "^2.6.11",
+		"vue-template-compiler": "^2.6.14",
 		"webpack": "^4.46.0"
 	},
 	"peerDependencies": {
 		"vue": "^2.6.14"
 	},
 	"dependencies": {
+		"emoji-picker-element": "^1.8.1",
 		"core-js": "^3.16.1",
-		"emoji-picker-element": "^1.7.0",
 		"linkifyjs": "^2.1.9",
 		"v-click-outside": "^3.1.2",
 		"vue-infinite-loading": "https://github.com/antoine92190/vue-infinite-loading/tarball/master"

@@ -40,6 +40,8 @@
 				:show-send-icon="showSendIcon"
 				:show-files="showFiles"
 				:show-audio="showAudio"
+				:audio-bit-rate="audioBitRate"
+				:audio-sample-rate="audioSampleRate"
 				:show-emojis="showEmojis"
 				:show-reaction-emojis="showReactionEmojis"
 				:show-new-messages-divider="showNewMessagesDivider"
@@ -54,6 +56,7 @@
 				:room-info-enabled="roomInfoEnabled"
 				:textarea-action-enabled="textareaActionEnabled"
 				:accepted-files="acceptedFiles"
+				:templates-text="templatesText"
 				@toggle-rooms-list="toggleRoomsList"
 				@room-info="roomInfo"
 				@fetch-messages="fetchMessages"
@@ -126,6 +129,8 @@ export default {
 		showSendIcon: { type: Boolean, default: true },
 		showFiles: { type: Boolean, default: true },
 		showAudio: { type: Boolean, default: true },
+		audioBitRate: { type: Number, default: 128 },
+		audioSampleRate: { type: Number, default: 44100 },
 		showEmojis: { type: Boolean, default: true },
 		showReactionEmojis: { type: Boolean, default: true },
 		showNewMessagesDivider: { type: Boolean, default: true },
@@ -133,12 +138,13 @@ export default {
 		textFormatting: { type: Boolean, default: true },
 		linkOptions: {
 			type: Object,
-			default: () => ({ disabled: false, target: '_blank' })
+			default: () => ({ disabled: false, target: '_blank', rel: null })
 		},
 		roomInfoEnabled: { type: Boolean, default: false },
 		textareaActionEnabled: { type: Boolean, default: false },
 		roomMessage: { type: String, default: '' },
-		acceptedFiles: { type: String, default: '*' }
+		acceptedFiles: { type: String, default: '*' },
+		templatesText: { type: Array, default: null }
 	},
 
 	emits: [

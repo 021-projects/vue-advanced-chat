@@ -132,12 +132,26 @@
 		>
 			<room-emojis
 				:filtered-emojis="filteredEmojis"
+				:select-item="selectEmojiItem"
+				:active-up-or-down="activeUpOrDownEmojis"
 				@select-emoji="selectEmoji($event)"
+				@activate-item="activeUpOrDownEmojis = 0"
 			/>
 
 			<room-users-tag
 				:filtered-users-tag="filteredUsersTag"
+				:select-item="selectUsersTagItem"
+				:active-up-or-down="activeUpOrDownUsersTag"
 				@select-user-tag="selectUserTag($event)"
+				@activate-item="activeUpOrDownUsersTag = 0"
+			/>
+
+			<room-templates-text
+				:filtered-templates-text="filteredTemplatesText"
+				:select-item="selectTemplatesTextItem"
+				:active-up-or-down="activeUpOrDownTemplatesText"
+				@select-template-text="selectTemplateText($event)"
+				@activate-item="activeUpOrDownTemplatesText = 0"
 			/>
 
 			<room-message-reply
@@ -210,8 +224,14 @@
 					}"
 					@input="onChangeInput"
 					@keydown.esc="escapeTextarea"
-					@keydown.enter.exact.prevent=""
+					@keydown.enter.exact.prevent="selectItem"
 					@paste="onPasteImage"
+					@keydown.tab.exact.prevent=""
+					@keydown.tab="selectItem"
+					@keydown.up.exact.prevent=""
+					@keydown.up="updateActiveUpOrDown(-1)"
+					@keydown.down.exact.prevent=""
+					@keydown.down="updateActiveUpOrDown(1)"
 				/>
 
 				<div class="vac-icon-textarea">
@@ -264,7 +284,7 @@
 						type="file"
 						multiple
 						:accept="acceptedFiles"
-						style="display:none"
+						style="display: none"
 						@change="onFileChange($event.target.files)"
 					/>
 
@@ -299,9 +319,10 @@ import RoomFiles from './RoomFiles/RoomFiles'
 import RoomMessageReply from './RoomMessageReply/RoomMessageReply'
 import RoomUsersTag from './RoomUsersTag/RoomUsersTag'
 import RoomEmojis from './RoomEmojis/RoomEmojis'
+import RoomTemplatesText from './RoomTemplatesText/RoomTemplatesText'
 import Message from '../Message/Message'
 
-import filteredUsers from '../../utils/filter-items'
+import filteredItems from '../../utils/filter-items'
 import Recorder from '../../utils/recorder'
 
 const { detectMobile, iOSDevice } = require('../../utils/mobile-detection')
@@ -328,6 +349,7 @@ export default {
 		RoomMessageReply,
 		RoomUsersTag,
 		RoomEmojis,
+		RoomTemplatesText,
 		Message
 	},
 
@@ -353,6 +375,8 @@ export default {
 		showSendIcon: { type: Boolean, required: true },
 		showFiles: { type: Boolean, required: true },
 		showAudio: { type: Boolean, required: true },
+		audioBitRate: { type: Number, required: true },
+		audioSampleRate: { type: Number, required: true },
 		showEmojis: { type: Boolean, required: true },
 		showReactionEmojis: { type: Boolean, required: true },
 		showNewMessagesDivider: { type: Boolean, required: true },
@@ -362,7 +386,8 @@ export default {
 		linkOptions: { type: Object, required: true },
 		loadingRooms: { type: Boolean, required: true },
 		roomInfoEnabled: { type: Boolean, required: true },
-		textareaActionEnabled: { type: Boolean, required: true }
+		textareaActionEnabled: { type: Boolean, required: true },
+		templatesText: { type: Array, default: null }
 	},
 
 	emits: [
@@ -400,6 +425,13 @@ export default {
 			filteredEmojis: [],
 			filteredUsersTag: [],
 			selectedUsersTag: [],
+			filteredTemplatesText: [],
+			selectEmojiItem: null,
+			selectUsersTagItem: null,
+			selectTemplatesTextItem: null,
+			activeUpOrDownEmojis: null,
+			activeUpOrDownUsersTag: null,
+			activeUpOrDownTemplatesText: null,
 			textareaCursorPosition: null,
 			cursorRangePosition: null,
 			emojisDB: new Database(),
@@ -444,6 +476,7 @@ export default {
 			return (
 				!!this.filteredEmojis.length ||
 				!!this.filteredUsersTag.length ||
+				!!this.filteredTemplatesText.length ||
 				!!this.files.length ||
 				!!this.messageReply
 			)
@@ -452,7 +485,7 @@ export default {
 
 	watch: {
 		message(val) {
-			this.$refs.roomTextarea.value = val
+			this.getTextareaRef().value = val
 		},
 		loadingMessages(val) {
 			if (val) {
@@ -510,14 +543,18 @@ export default {
 		this.newMessages = []
 		const isMobile = detectMobile()
 
-		this.$refs.roomTextarea.addEventListener(
+		this.getTextareaRef().addEventListener(
 			'keyup',
 			debounce(e => {
 				if (e.key === 'Enter' && !e.shiftKey && !this.fileDialog) {
 					if (isMobile) {
 						this.message = this.message + '\n'
 						setTimeout(() => this.onChangeInput())
-					} else {
+					} else if (
+						!this.filteredEmojis.length &&
+						!this.filteredUsersTag.length &&
+						!this.filteredTemplatesText.length
+					) {
 						this.sendMessage()
 					}
 				}
@@ -525,19 +562,21 @@ export default {
 				setTimeout(() => {
 					this.updateFooterList('@')
 					this.updateFooterList(':')
+					this.updateFooterList('/')
 				}, 60)
 			}),
 			50
 		)
 
-		this.$refs['roomTextarea'].addEventListener('click', () => {
+		this.getTextareaRef().addEventListener('click', () => {
 			if (isMobile) this.keepKeyboardOpen = true
 
 			this.updateFooterList('@')
 			this.updateFooterList(':')
+			this.updateFooterList('/')
 		})
 
-		this.$refs['roomTextarea'].addEventListener('blur', () => {
+		this.getTextareaRef().addEventListener('blur', () => {
 			this.resetFooterList()
 			if (isMobile) setTimeout(() => (this.keepKeyboardOpen = false))
 		})
@@ -548,6 +587,9 @@ export default {
 	},
 
 	methods: {
+    getTextareaRef() {
+      return this.$refs.roomTextarea
+    },
 		onRoomChanged() {
 			this.loadingMessages = true
 			this.scrollIcon = false
@@ -610,7 +652,7 @@ export default {
 			this.scrollIcon = bottomScroll > 500 || this.scrollMessagesCount
 		},
 		updateFooterList(tagChar) {
-			if (!this.$refs['roomTextarea']) return
+			if (!this.getTextareaRef()) return
 
 			if (
 				tagChar === '@' &&
@@ -619,14 +661,17 @@ export default {
 				return
 			}
 
+			if (tagChar === '/' && !this.templatesText) {
+				return
+			}
+
 			if (
-				this.textareaCursorPosition ===
-				this.$refs['roomTextarea'].selectionStart
+				this.textareaCursorPosition === this.getTextareaRef().selectionStart
 			) {
 				return
 			}
 
-			this.textareaCursorPosition = this.$refs['roomTextarea'].selectionStart
+			this.textareaCursorPosition = this.getTextareaRef().selectionStart
 
 			let position = this.textareaCursorPosition
 
@@ -653,13 +698,15 @@ export default {
 					this.updateEmojis(query)
 				} else if (tagChar === '@') {
 					this.updateShowUsersTag(query)
+				} else if (tagChar === '/') {
+					this.updateShowTemplatesText(query)
 				}
 			} else {
 				this.resetFooterList(tagChar)
 			}
 		},
 		getCharPosition(tagChar) {
-			const cursorPosition = this.$refs['roomTextarea'].selectionStart
+			const cursorPosition = this.getTextareaRef().selectionStart
 
 			let position = cursorPosition
 			while (position > 0 && this.message.charAt(position - 1) !== tagChar) {
@@ -683,6 +730,10 @@ export default {
 			this.filteredEmojis = emojis.map(emoji => emoji.unicode)
 		},
 		selectEmoji(emoji) {
+			this.selectEmojiItem = false
+
+			if (!emoji) return
+
 			const { position, endPosition } = this.getCharPosition(':')
 
 			this.message =
@@ -694,14 +745,18 @@ export default {
 			this.focusTextarea()
 		},
 		updateShowUsersTag(query) {
-			this.filteredUsersTag = filteredUsers(
+			this.filteredUsersTag = filteredItems(
 				this.room.users,
 				'username',
 				query,
 				true
 			).filter(user => user._id !== this.currentUserId)
 		},
-		selectUserTag(user) {
+		selectUserTag(user, editMode = false) {
+			this.selectUsersTagItem = false
+
+			if (!user) return
+
 			const { position, endPosition } = this.getCharPosition('@')
 
 			const space = this.message.substr(endPosition, endPosition).length
@@ -716,18 +771,72 @@ export default {
 
 			this.selectedUsersTag = [...this.selectedUsersTag, { ...user }]
 
-			this.cursorRangePosition =
-				position + user.username.length + space.length + 1
+			if (!editMode) {
+				this.cursorRangePosition =
+					position + user.username.length + space.length + 1
+			}
+
 			this.focusTextarea()
+		},
+		updateShowTemplatesText(query) {
+			this.filteredTemplatesText = filteredItems(
+				this.templatesText,
+				'tag',
+				query,
+				true
+			)
+		},
+		selectTemplateText(template) {
+			this.selectTemplatesTextItem = false
+
+			if (!template) return
+
+			const { position, endPosition } = this.getCharPosition('/')
+
+			const space = this.message.substr(endPosition, endPosition).length
+				? ''
+				: ' '
+
+			this.message =
+				this.message.substr(0, position - 1) +
+				template.text +
+				space +
+				this.message.substr(endPosition, this.message.length - 1)
+
+			this.cursorRangePosition =
+				position + template.text.length + space.length + 1
+
+			this.focusTextarea()
+		},
+		updateActiveUpOrDown(direction) {
+			if (this.filteredEmojis.length) {
+				this.activeUpOrDownEmojis = direction
+			} else if (this.filteredUsersTag.length) {
+				this.activeUpOrDownUsersTag = direction
+			} else if (this.filteredTemplatesText.length) {
+				this.activeUpOrDownTemplatesText = direction
+			}
+		},
+		selectItem() {
+			if (this.filteredEmojis.length) {
+				this.selectEmojiItem = true
+			} else if (this.filteredUsersTag.length) {
+				this.selectUsersTagItem = true
+			} else if (this.filteredTemplatesText.length) {
+				this.selectTemplatesTextItem = true
+			}
 		},
 		resetFooterList(tagChar = null) {
 			if (tagChar === ':') {
 				this.filteredEmojis = []
 			} else if (tagChar === '@') {
 				this.filteredUsersTag = []
+			} else if (tagChar === '/') {
+				this.filteredTemplatesText = []
 			} else {
 				this.filteredEmojis = []
 				this.filteredUsersTag = []
+				this.filteredTemplatesText = []
 			}
 
 			this.textareaCursorPosition = null
@@ -735,7 +844,9 @@ export default {
 		escapeTextarea() {
 			if (this.filteredEmojis.length) this.filteredEmojis = []
 			else if (this.filteredUsersTag.length) this.filteredUsersTag = []
-			else this.resetMessage()
+			else if (this.filteredTemplatesText.length) {
+				this.filteredTemplatesText = []
+			} else this.resetMessage()
 		},
 		resetMessage(disableMobileFocus = false, initRoom = false) {
 			if (!initRoom) {
@@ -754,17 +865,18 @@ export default {
 			setTimeout(() => this.focusTextarea(disableMobileFocus))
 		},
 		resetTextareaSize() {
-			if (!this.$refs['roomTextarea']) return
-			this.$refs['roomTextarea'].style.height = '20px'
+			if (this.getTextareaRef()) {
+				this.getTextareaRef().style.height = '20px'
+			}
 		},
 		focusTextarea(disableMobileFocus) {
 			if (detectMobile() && disableMobileFocus) return
-			if (!this.$refs['roomTextarea']) return
-			this.$refs['roomTextarea'].focus()
+			if (!this.getTextareaRef()) return
+			this.getTextareaRef().focus()
 
 			if (this.cursorRangePosition) {
 				setTimeout(() => {
-					this.$refs['roomTextarea'].setSelectionRange(
+					this.getTextareaRef().setSelectionRange(
 						this.cursorRangePosition,
 						this.cursorRangePosition
 					)
@@ -773,7 +885,7 @@ export default {
 			}
 		},
 		preventKeyboardFromClosing() {
-			if (this.keepKeyboardOpen) this.$refs['roomTextarea'].focus()
+			if (this.keepKeyboardOpen) this.getTextareaRef().focus()
 		},
 		sendMessage() {
 			let message = this.message.trim()
@@ -790,7 +902,11 @@ export default {
 			const files = this.files.length ? this.files : null
 
 			if (this.editedMessage._id) {
-				if (this.editedMessage.content !== message || files) {
+				if (
+					this.editedMessage.content !== message ||
+					this.editedMessage.files?.length ||
+					this.files.length
+				) {
 					this.$emit('edit-message', {
 						messageId: this.editedMessage._id,
 						newContent: message,
@@ -856,11 +972,40 @@ export default {
 			this.resetMessage()
 
 			this.editedMessage = { ...message }
-			this.message = message.content
+
+			let messageContent = message.content
+			const initialContent = messageContent
+
+			const firstTag = '<usertag>'
+			const secondTag = '</usertag>'
+
+			const usertags = [
+				...messageContent.matchAll(new RegExp(firstTag, 'gi'))
+			].map(a => a.index)
+
+			usertags.forEach(index => {
+				const userId = initialContent.substring(
+					index + firstTag.length,
+					initialContent.indexOf(secondTag, index)
+				)
+
+				const user = this.room.users.find(user => user._id === userId)
+
+				messageContent = messageContent.replace(
+					`${firstTag}${userId}${secondTag}`,
+					`@${user?.username || 'unknown'}`
+				)
+
+				this.selectUserTag(user, true)
+			})
+
+			this.message = messageContent
 
 			if (message.files) {
 				this.files = [...message.files]
 			}
+
+			setTimeout(() => this.resizeTextarea())
 		},
 		getBottomScroll(element) {
 			const { scrollHeight, clientHeight, scrollTop } = element
@@ -883,7 +1028,7 @@ export default {
 			this.$emit('typing-message', this.message)
 		}, 100),
 		resizeTextarea() {
-			const el = this.$refs['roomTextarea']
+			const el = this.getTextareaRef()
 
 			if (!el) return
 
@@ -938,11 +1083,14 @@ export default {
 		},
 		removeFile(index) {
 			this.files.splice(index, 1)
+			this.focusTextarea()
 		},
 		initRecorder() {
 			this.isRecording = false
 
 			return new Recorder({
+				bitRate: this.audioBitRate,
+				sampleRate: this.audioSampleRate,
 				beforeRecording: null,
 				afterRecording: null,
 				pauseRecording: null,
